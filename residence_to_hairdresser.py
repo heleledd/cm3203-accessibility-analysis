@@ -49,14 +49,18 @@ def get_street_network_graph(location_point, distance):
     else:
         print("Street network graph not found. Downloading from OpenStreetMap...")
         G =  ox.graph_from_point(location_point, dist=distance, dist_type="network", network_type="walk")
+        
+        # add edge lengths to the graph (instructions say to do this before projecting or simplifying the graph)
+        ox.distance.add_edge_lengths(G)
+        
         G_proj = ox.projection.project_graph(G, to_crs="EPSG:27700")
 
-        ox.distance.add_edge_lengths(G_proj)
         ox.save_graphml(G_proj, filepath="data/cardiff_network.graphml")
 
         return G_proj
 
 
+""" download hairdressers from OpenStreetMap and find the nearest network node to each hairdresser"""
 def get_hairdressers(G, location_point, distance):
     # find the nearest hairdresser to the start node and get its node id
     hairdresser_tags = {"shop": "hairdresser"}
@@ -75,7 +79,7 @@ def get_hairdressers(G, location_point, distance):
     return hairdressers_gdf
 
 
-""" finds the shortest route between two nodes in the graph and plots it"""
+""" ranks closest hairdressers andfinds the shortest route between two nodes in the graph and plots it"""
 def get_shortest_route(G, start_node, hairdressers_gdf):
     # find closest nodes to the start point
     nearest_node_id, distance_to_node = ox.distance.nearest_nodes(G, start_node.geometry.iloc[0].x, start_node.geometry.iloc[0].y, return_dist=True)
@@ -89,36 +93,43 @@ def get_shortest_route(G, start_node, hairdressers_gdf):
     print("Closest hairdressers ranked by distance:")
     print(hairdressers_ranked[['name', 'distance_m']] if 'name' in hairdressers_ranked.columns else hairdressers_ranked[['distance_m']])
 
-    # shortest path through network node for the 10 seemingly closest hairdressers
-    route = ox.routing.shortest_path(G, nearest_node_id, hairdressers_ranked.iloc[0]['nearest_node'], weight="length")
-    
-    # Calculate network distance to each hairdresser
-    distances = []
-    for idx, row in hairdressers_ranked.iloc[:10].iterrows():
+    # Calculate distance through the network to the top 5 geographically closest results
+    distances = {}
+    for idx, row in hairdressers_ranked.iloc[:5].iterrows():
         try:
-            # Calculate shortest path length
-            distance = ox.routing.shortest_path(
+            print(row['nearest_node'])
+            
+            # Calculate shortest route to the destination based on length 
+            route = ox.routing.shortest_path(
                 G, 
                 nearest_node_id, 
                 row['nearest_node'], 
                 weight='length',
                 cpus=1
             )
-            if distance:
-                # Sum up edge lengths along the path
-                path_length = sum(ox.utils_graph.get_route_edge_attributes(G, distance, 'length'))
-                distances.append(path_length)
 
-                # plot the route
-                fig, ax = ox.plot.plot_graph_route(G, distance, route_color="y", route_linewidth=6, node_size=0)
-                plt.show()
-            else:
-                distances.append(float('inf'))  # No path found
-        except:
-            distances.append(float('inf'))  # Error in routing
+            print(route)
 
-    # plot the route
+            # calculate the actual distance of the route
+            route_length = round(nx.path_weight(G, route, weight='length'), 2)
+
+            print(f"Route length: {route_length}")
+
+            distances[row['nearest_node']] = route_length
+        except nx.NetworkXNoPath:
+            print(f"No path found to hairdresser: {row['name'] if 'name' in row else idx}")
+            distances[row['nearest_node']] = float('inf')  # Assign infinity if no path is found
+            continue
+
     
+    # discover which one was the shortest route
+    if distances:
+        closest_hairdresser_node = min(distances, key=distances.get)
+        print(f"Closest hairdresser node based on route length: {closest_hairdresser_node} with distance {distances[closest_hairdresser_node]} metres")
+    else:
+        print("No hairdressers found within the specified distance.")
+        return
+
 
 def main(location_point, distance, postcode_file_path):
     # get the street network graph and the postcode locations
@@ -133,6 +144,7 @@ def main(location_point, distance, postcode_file_path):
     haidressers_gdf = get_hairdressers(G, location_point, distance)
 
     get_shortest_route(G, start_node, haidressers_gdf)
+
 
 def __main__():
     location_point = (51.496103, -3.173560) # 115 mackintosh place
