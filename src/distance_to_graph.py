@@ -1,5 +1,8 @@
+# working on making a chloropleth map with folium
+
 import folium
 import osmnx as ox
+import pandas as pd
 
 def display_with_folium(location_point, G):
     # apparently folium only works with lat/lon
@@ -22,7 +25,21 @@ def display_with_folium(location_point, G):
 
 
 def folium_chloropleth_tutorial():
-    ...
+    eco_footprints = pd.read_csv('data/footprint.csv')
+    political_countries_url = (
+    "http://geojson.xyz/naturalearth-3.3.0/ne_50m_admin_0_countries.geojson"
+    )
+
+    m = folium.Map(location=(30, 10), zoom_start=3, tiles="cartodb positron")
+    # folium.GeoJson(political_countries_url).add_to(m)
+    folium.Choropleth(
+        geo_data=political_countries_url,
+        data=eco_footprints,
+        columns=["Country/region", "Ecological footprint"],
+        key_on="feature.properties.name",
+    ).add_to(m)
+
+    m.save("footprint.html")
 
 def main():
     
