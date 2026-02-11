@@ -9,9 +9,9 @@ import os
 
 """ returns a GeoDataFrame of postcodes and their coordinates"""
 def get_postcode_locations(file_path):
-    if os.path.exists("data/cardiff_postcodes.geojson"):
+    if os.path.exists("../data/cardiff_postcodes.geojson"):
         print("Cardiff postcodes GeoJSON file already exists. Loading from file...")
-        gdf = gpd.read_file("data/cardiff_postcodes.geojson")
+        gdf = gpd.read_file("../data/cardiff_postcodes.geojson")
         return gdf
     else:
         print("Cardiff postcodes GeoJSON file not found. Processing ONS postcodes CSV file...")
@@ -35,16 +35,16 @@ def get_postcode_locations(file_path):
         gdf = gdf.to_crs('EPSG:27700')
 
         # save the geodataframe to json file
-        gdf.to_file('data/cardiff_postcodes.geojson', driver="GeoJSON")
+        gdf.to_file('../data/cardiff_postcodes.geojson', driver="GeoJSON")
 
         return gdf
 
 
 """ returns a MultiDigraph of the walkable network around a location point"""
 def get_street_network_graph(location_point, distance):
-    if os.path.exists("data/cardiff_network.graphml"):
+    if os.path.exists("../data/cardiff_network.graphml"):
         print("Street network graph already exists. Loading from file...")
-        G = ox.io.load_graphml("data/cardiff_network.graphml")
+        G = ox.io.load_graphml("../data/cardiff_network.graphml")
         return G
     else:
         print("Street network graph not found. Downloading from OpenStreetMap...")
@@ -55,7 +55,7 @@ def get_street_network_graph(location_point, distance):
         
         G_proj = ox.projection.project_graph(G, to_crs="EPSG:27700")
 
-        ox.save_graphml(G_proj, filepath="data/cardiff_network.graphml")
+        ox.save_graphml(G_proj, filepath="../data/cardiff_network.graphml")
 
         return G_proj
 
@@ -172,14 +172,14 @@ def main(location_point, distance, postcode_file_path):
         filtered_postcodes.at[idx, 'shortest_supermarket_m'] = shortest_distance
 
     # save the results to a new GeoJSON file
-    filtered_postcodes.to_file('data/filtered_postcodes_with_distances.geojson', driver='GeoJSON')
+    filtered_postcodes.to_file('../data/filtered_postcodes_with_distances.geojson', driver='GeoJSON')
 
 
 def __main__():
     location_point = (51.496103, -3.173560) # 115 mackintosh place
     distance = 2000  # metres
 
-    postcode_file_path = "data/ons_postcodes/ONSPD_FEB_2023_UK_CF.csv"
+    postcode_file_path = "../data/ons_postcodes/ONSPD_FEB_2023_UK_CF.csv"
 
     main(location_point, distance, postcode_file_path)
 
