@@ -6,6 +6,7 @@ import pandas as pd
 import geopandas as gpd
 import networkx as nx
 import os
+from datetime import datetime
 
 """ returns a GeoDataFrame of postcodes and their coordinates"""
 def get_postcode_locations(file_path):
@@ -170,6 +171,11 @@ def main(location_point, distance, postcode_file_path):
         
         # store the returned shortest distance (None if not found)
         filtered_postcodes.at[idx, 'shortest_supermarket_m'] = shortest_distance
+
+
+    # today's date and time for the output file name
+
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
     # save the results to a new GeoJSON file
     filtered_postcodes.to_file('../data/filtered_postcodes_with_distances.geojson', driver='GeoJSON')
