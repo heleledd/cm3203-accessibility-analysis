@@ -223,15 +223,12 @@ def main(bbox):
     
     # iterate through the filtered grid cells and find the shortest distance to a feature for each one
     for idx, row in grid_cells_gdf.iterrows():
-        all_grid_node_distances = []
-        for node in row['nodes']:
-            node_shortest_distance = get_shortest_route(G, node, features_gdf)
-            all_grid_node_distances.append(node_shortest_distance) if node_shortest_distance is not None else None
-        
-        avg_shortest_distance = sum(all_grid_node_distances) / len(all_grid_node_distances)
+        cell_centroid = row.geometry.centroid
+        shortest_distance = get_shortest_route(G, cell_centroid, features_gdf)
+        # maybe add the distance to the node on top as well??
         
         # store the returned shortest distance (None if not found)
-        grid_cells_gdf.at[idx, 'nearest_hospital'] = avg_shortest_distance
+        grid_cells_gdf.at[idx, 'nearest_hospital'] = shortest_distance
 
 
     # today's date and time for the output file name
