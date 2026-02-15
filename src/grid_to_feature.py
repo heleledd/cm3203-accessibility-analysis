@@ -7,6 +7,7 @@ import geopandas as gpd
 import networkx as nx
 import os
 from datetime import datetime
+from tqdm import tqdm
 import logging
 
 
@@ -20,7 +21,7 @@ def get_street_network_graph(bbox=(-3.35, 51.37, -3.05, 51.57)):
     else:
         logging.info("Street network graph not found. Downloading from OpenStreetMap...")
 
-        G =  ox.graph_from_bbox(bbox, network_type="walk", simplify=False, retain_all=True)
+        G =  ox.graph_from_bbox(bbox, network_type="walk", simplify=False, retain_all=False)
         
         # add edge lengths to the graph (instructions say to do this before projecting or simplifying the graph)
         ox.distance.add_edge_lengths(G)
@@ -130,12 +131,25 @@ def get_features(G, bbox, tags={"shop": "hairdresser"}):
 
 
 """ ranks closest features and finds the shortest route between two nodes in the graph and plots it"""
-def get_shortest_route(G, start_node, features_gdf):
-    # find closest nodes to the start point
-    nearest_node_id, distance_to_node = ox.distance.nearest_nodes(G, start_node.geometry.iloc[0].x, start_node.geometry.iloc[0].y, return_dist=True)
+def get_shortest_route(G, start_node, features_gdf, cache=None):
+    """Find shortest network distance from start_node to features.
+
+    Uses a simple cache keyed by the nearest graph node id so repeated
+    queries from the same graph node reuse previous shortest-path results.
+    """
+    if cache is None:
+        cache = {}
+
+    # find closest node to the start point
+    nearest_node_id, distance_to_node = ox.distance.nearest_nodes(G, start_node.x, start_node.y, return_dist=True)
+
+    # If we've already computed shortest-paths from this graph node, reuse them
+    if nearest_node_id in cache:
+        logging.debug(f"Reusing cached shortest-path for start node {nearest_node_id}")
+        return cache[nearest_node_id]['closest']
 
     # find each feature's distance to the start node
-    features_gdf['distance_m'] = features_gdf.geometry.distance(start_node.geometry.iloc[0])
+    features_gdf['distance_m'] = features_gdf.geometry.distance(start_node)
     
     # Sort by distance (closest first)
     features_ranked = features_gdf.sort_values('distance_m')
@@ -143,9 +157,10 @@ def get_shortest_route(G, start_node, features_gdf):
     # print("Closest features ranked by distance:")
     # print(features_ranked[['name', 'distance_m']] if 'name' in features_ranked.columns else features_ranked[['distance_m']])
 
-    # Calculate distance through the network to the top 5 geographically closest results
+    # Calculate distance through the network to the top 3 geographically closest results
+    # tqdm adds a progress bar
     distances = {}
-    for idx, row in features_ranked.iloc[:5].iterrows():
+    for idx, row in tqdm(features_ranked.iloc[:3].iterrows()):
         try:
             
             # Calculate shortest route to the destination based on length 
@@ -173,7 +188,12 @@ def get_shortest_route(G, start_node, features_gdf):
     if distances:
         closest_feature_node = min(distances, key=distances.get)
         logging.info(f"Closest feature node based on route length: {closest_feature_node} with distance {distances[closest_feature_node]} metres")
-        
+        # cache the computed distances (store both mapping and chosen minimum)
+        cache[nearest_node_id] = {
+            'distances': distances,
+            'closest': distances[closest_feature_node]
+        }
+
         # return shortest distance to a feature
         return distances[closest_feature_node]
     else:
@@ -222,9 +242,11 @@ def main(bbox):
 
     
     # iterate through the filtered grid cells and find the shortest distance to a feature for each one
+    # use a simple cache so repeated queries from the same nearest graph node are reused
+    route_cache = {}
     for idx, row in grid_cells_gdf.iterrows():
         cell_centroid = row.geometry.centroid
-        shortest_distance = get_shortest_route(G, cell_centroid, features_gdf)
+        shortest_distance = get_shortest_route(G, cell_centroid, features_gdf, cache=route_cache)
         # maybe add the distance to the node on top as well??
         
         # store the returned shortest distance (None if not found)
@@ -246,9 +268,15 @@ def __main__():
     )
     
     # (east longitude, south latitude, west longitude, north latitude)
+    
+    # all of cardiff
     cardiff_bbox_lat_long = (-3.35, 51.37, -3.05, 51.57)
 
-    main(cardiff_bbox_lat_long)
+
+    # cardiff city centre
+    smaller_bbox_lat_long = (-3.21, 51.49, -3.16, 51.51)
+
+    main(smaller_bbox_lat_long)
 
 
 if __name__ == "__main__":
