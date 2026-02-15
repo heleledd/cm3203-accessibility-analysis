@@ -10,12 +10,16 @@ from datetime import datetime
 from tqdm import tqdm
 import logging
 
+# Set up paths relative to script location
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+DATA_DIR = os.path.join(SCRIPT_DIR, '../data')
 
 """ returns a MultiDigraph of the walkable network around a location point"""
 def get_street_network_graph(bbox=(-3.35, 51.37, -3.05, 51.57)):
-    if os.path.exists("../data/cardiff_network.graphml"):
+    network_path = os.path.join(DATA_DIR, 'cardiff_network.graphml')
+    if os.path.exists(network_path):
         logging.info("Street network graph already exists. Loading from file...")
-        G = ox.io.load_graphml("../data/cardiff_network.graphml")
+        G = ox.io.load_graphml(network_path)
         logging.info("Street network graph loaded successfully.")
         return G
     else:
@@ -28,7 +32,7 @@ def get_street_network_graph(bbox=(-3.35, 51.37, -3.05, 51.57)):
         
         G_proj = ox.projection.project_graph(G, to_crs="EPSG:27700")
 
-        ox.save_graphml(G_proj, filepath="../data/cardiff_network.graphml")
+        ox.save_graphml(G_proj, filepath=network_path)
         logging.info("Street network graph downloaded and saved to file.")
 
         return G_proj
@@ -36,9 +40,10 @@ def get_street_network_graph(bbox=(-3.35, 51.37, -3.05, 51.57)):
 
 """Split a bounding box into a grid of smaller cells in a GeoDataFrame"""
 def split_bbox_into_grid(bbox, grid_size):
-    if os.path.exists(f'../data/cardiff_grid_cells_{grid_size}m.geojson'):
+    grid_path = os.path.join(DATA_DIR, f'cardiff_grid_cells_{grid_size}m.geojson')
+    if os.path.exists(grid_path):
         logging.info("Cardiff grid cells GeoJSON file already exists. Loading from file...")
-        gdf = gpd.read_file(f"../data/cardiff_grid_cells_{grid_size}m.geojson")
+        gdf = gpd.read_file(grid_path)
         logging.info("Cardiff grid cells GeoJSON file loaded successfully.")
         return gdf
     else:
@@ -70,7 +75,7 @@ def split_bbox_into_grid(bbox, grid_size):
         # grid_gdf['centroid'] = grid_gdf.geometry.centroid
 
         # save the geodataframe to json file
-        grid_gdf.to_file(f'../data/cardiff_grid_cells_{grid_size}m.geojson', driver="GeoJSON")
+        grid_gdf.to_file(grid_path, driver="GeoJSON")
         logging.info("Cardiff grid cells GeoJSON file created and saved to file.")
         return grid_gdf
 
@@ -158,9 +163,8 @@ def get_shortest_route(G, start_node, features_gdf, cache=None):
     # print(features_ranked[['name', 'distance_m']] if 'name' in features_ranked.columns else features_ranked[['distance_m']])
 
     # Calculate distance through the network to the top 3 geographically closest results
-    # tqdm adds a progress bar
     distances = {}
-    for idx, row in tqdm(features_ranked.iloc[:3].iterrows()):
+    for idx, row in features_ranked.iloc[:3].iterrows():
         try:
             
             # Calculate shortest route to the destination based on length 
@@ -175,7 +179,7 @@ def get_shortest_route(G, start_node, features_gdf, cache=None):
             # calculate the actual distance of the route
             route_length = round(nx.path_weight(G, route, weight='length'), 2)
 
-            print(f"Route length from start node {nearest_node_id} to feature node {row['nearest_node']}: {route_length}")
+            tqdm.write(f"Route length from start node {nearest_node_id} to feature node {row['nearest_node']}: {route_length}")
 
             distances[row['nearest_node']] = route_length
         except nx.NetworkXNoPath:
@@ -244,20 +248,28 @@ def main(bbox):
     # iterate through the filtered grid cells and find the shortest distance to a feature for each one
     # use a simple cache so repeated queries from the same nearest graph node are reused
     route_cache = {}
-    for idx, row in grid_cells_gdf.iterrows():
+    
+    # Suppress verbose logging during processing for cleaner output
+    logging.getLogger().setLevel(logging.WARNING)
+    
+    for idx, row in tqdm(grid_cells_gdf.iterrows(), total=len(grid_cells_gdf), desc="Processing grid cells"):
         cell_centroid = row.geometry.centroid
         shortest_distance = get_shortest_route(G, cell_centroid, features_gdf, cache=route_cache)
         # maybe add the distance to the node on top as well??
         
         # store the returned shortest distance (None if not found)
         grid_cells_gdf.at[idx, 'nearest_hospital'] = shortest_distance
+    
+    # Restore logging level
+    logging.getLogger().setLevel(logging.DEBUG)
 
 
     # today's date and time for the output file name
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
     # save the results to a new GeoJSON file
-    grid_cells_gdf.to_file(f'../data/grid_cells_with_hospital_distances_{timestamp}.geojson', driver='GeoJSON')
+    output_path = os.path.join(DATA_DIR, f'grid_cells_with_hospital_distances_{timestamp}.geojson')
+    grid_cells_gdf.to_file(output_path, driver='GeoJSON')
 
 
 def __main__():
