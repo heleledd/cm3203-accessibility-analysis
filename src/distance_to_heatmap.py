@@ -36,7 +36,7 @@ def create_heatmap(geojson_data):
     for feature in geojson_data['features']:
         lat = feature['properties']['lat']
         lon = feature['properties']['long']
-        distance = feature['properties']['distance_to_location']
+        distance = feature['properties']['nearest_hospital']
         
         # Higher distance = worse access = higher heat intensity
         # Normalize the distance value for better visualization
@@ -81,11 +81,11 @@ def create_heatmap(geojson_data):
         distance = feature['properties']['distance_to_location']
         
         # Color code markers based on distance
-        if distance < 500:
+        if distance < 1000:
             color = 'green'
-        elif distance < 1000:
+        elif distance < 2000:
             color = 'lightgreen'
-        elif distance < 1500:
+        elif distance < 3000:
             color = 'orange'
         else:
             color = 'red'
@@ -93,7 +93,7 @@ def create_heatmap(geojson_data):
         folium.CircleMarker(
             location=[lat, lon],
             radius=5,
-            popup=f"<b>{postcode}</b><br>Distance to supermarket: {distance:.0f}m",
+            popup=f"<b>{postcode}</b><br>Distance to nearest hospital: {distance:.0f}m",
             tooltip=postcode,
             color=color,
             fill=True,
@@ -138,7 +138,7 @@ def create_heatmap(geojson_data):
     return abs_path
 
 if __name__ == "__main__":
-    print("Creating Cardiff Supermarket Access Heatmap...")
+    print("Creating Cardiff Accessibility Heatmap...")
     print("-" * 50)
     
     # Check if filename provided as command line argument

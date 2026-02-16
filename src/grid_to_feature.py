@@ -2,7 +2,6 @@ import osmnx as ox
 import folium
 import matplotlib.pyplot as plt
 from shapely.geometry import Point, box
-import pandas as pd
 import geopandas as gpd
 import networkx as nx
 import os
@@ -288,7 +287,7 @@ def __main__():
     # cardiff city centre
     smaller_bbox_lat_long = (-3.21, 51.49, -3.16, 51.51)
 
-    main(smaller_bbox_lat_long)
+    main(cardiff_bbox_lat_long)
 
 
 if __name__ == "__main__":
