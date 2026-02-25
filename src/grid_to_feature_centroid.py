@@ -1,5 +1,4 @@
 import osmnx as ox
-import folium
 import matplotlib.pyplot as plt
 from shapely.geometry import Point, box
 import geopandas as gpd

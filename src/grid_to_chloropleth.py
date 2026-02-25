@@ -36,9 +36,6 @@ def main(geojson_data):
     m.save('hospital_chloropleth.html')
 
 
-
-
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Generate a heatmap of accessibility to supermarkets in Cardiff.')
     parser.add_argument('--input', type=str, default='output/geojson/supermarket_access.geojson', help='Path to the input GeoJSON file')
