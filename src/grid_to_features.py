@@ -15,9 +15,14 @@ if os.environ.get('GITHUB_ACTIONS') == 'true':
     INPUT_DATA_DIR = os.path.join(os.getcwd())
     
     OUTPUT_DATA_DIR = os.path.join(os.getcwd())
+    # GitHub Actions runs from repo root
+    INPUT_DATA_DIR = os.path.join(os.getcwd(), 'data', 'input_data')
+    OUTPUT_DATA_DIR = os.path.join(os.getcwd(), 'data')
 else:
     INPUT_DATA_DIR = os.path.join(SCRIPT_DIR, '../data/input_data')
     OUTPUT_DATA_DIR = os.path.join(SCRIPT_DIR, '../output')
+
+os.makedirs(INPUT_DATA_DIR, exist_ok=True)
 
 TARGET_CRS = 'EPSG:27700'
 
@@ -104,9 +109,8 @@ def find_nearest_boundary_node(G, boundary):
     ys = [p.y for p in sample_points]
     return ox.distance.nearest_nodes(G, xs, ys)
 
-def get_park_boundary_nodes(G):
+def get_park_boundary_nodes(G, park_path):
     """Loads parks from local GeoJSON and maps their boundaries to network nodes."""
-    park_path = os.path.join(INPUT_DATA_DIR, 'cardiff_parks.geojson')
     park_gdf = gpd.read_file(park_path).to_crs(TARGET_CRS)
     park_gdf['boundary'] = park_gdf.geometry.boundary
     logging.info("Mapping park boundary nodes (this may take a moment)...")
@@ -196,14 +200,14 @@ def get_shortest_centroid_route(G, start_node, features_gdf, cache):
 # MAIN
 # ==========================================
 
-def main(bbox, grid_size, github_actions):
+def main(bbox, grid_size, parks_path, github_actions):
     # Initialize Network and Grid
     G = get_street_network_graph(bbox)
     bbox_reprojected = reproject_bbox(bbox)
     grid_cells_gdf = split_bbox_into_grid(bbox_reprojected, grid_size)
 
     # Prepare destination features
-    parks_gdf = get_park_boundary_nodes(G)
+    parks_gdf = get_park_boundary_nodes(G, parks_path)
     gps_gdf = get_osm_features(G, bbox, tags={"amenity": "doctors"})
     schools_gdf = get_osm_features(G, bbox, tags={"amenity": "school"})
 
@@ -251,11 +255,15 @@ if __name__ == "__main__":
     cardiff_bbox = (-3.21, 51.49, -3.16, 51.51)
     grid_size_meters = 100
 
+    # Define parks path
+    parks_file = 'cardiff_parks.geojson'
+    parks_path = os.path.join(INPUT_DATA_DIR, parks_file)
 
     # let the user know where the script thinks it's running
-    if os.environ.get('GITHUB_ACTIONS') == 'true':
+    is_github_actions = os.environ.get('GITHUB_ACTIONS') == 'true'
+    if is_github_actions:
         print("Running in GitHub Actions!")
     else:
         print("Running locally!")
 
-    main(cardiff_bbox, grid_size_meters)
+    main(cardiff_bbox, grid_size_meters, parks_path, is_github_actions)

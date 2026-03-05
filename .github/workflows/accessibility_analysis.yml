@@ -10,6 +10,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          lfs: true
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -33,5 +35,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: accessibility-results
-          path: *.geojson
+          path: data/output/*.geojson
           if-no-files-found: warn
