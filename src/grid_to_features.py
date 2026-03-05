@@ -252,7 +252,9 @@ if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
     
     # Cardiff city centre bbox for testing (west, south, east, north)
-    cardiff_bbox = (-3.21, 51.49, -3.16, 51.51)
+    # cardiff_bbox = (-3.21, 51.49, -3.16, 51.51)
+
+    cardiff_bbox = (-3.35, 51.37, -3.05, 51.57)
     grid_size_meters = 100
 
     # Define parks path
