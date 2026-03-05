@@ -9,7 +9,17 @@ import logging
 
 # Set up paths relative to script location
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-DATA_DIR = os.path.join(SCRIPT_DIR, '../data')
+
+if os.environ.get('GITHUB_ACTIONS') == 'true':
+    # ! Find how to get github actions to access the parks data
+    INPUT_DATA_DIR = os.path.join(os.getcwd(), 'data')
+    
+    # ! Find how to get it to make a new file and output the files there
+    OUTPUT_DATA_DIR = os.path.join(os.getcwd(), 'data')
+else:
+    INPUT_DATA_DIR = os.path.join(SCRIPT_DIR, '../data/input_data')
+    OUTPUT_DATA_DIR = os.path.join(SCRIPT_DIR, '../output')
+
 TARGET_CRS = 'EPSG:27700'
 
 # ==========================================
@@ -18,7 +28,7 @@ TARGET_CRS = 'EPSG:27700'
 
 def get_street_network_graph(bbox):
     """Returns a MultiDiGraph of the walkable network around a bounding box, projected to EPSG:27700."""
-    network_path = os.path.join(DATA_DIR, 'cardiff_network.graphml')
+    network_path = os.path.join(INPUT_DATA_DIR, 'cardiff_network.graphml')
     if os.path.exists(network_path):
         logging.info("Street network graph already exists. Loading from file...")
         G = ox.io.load_graphml(network_path)
@@ -59,7 +69,7 @@ def reproject_bbox(bbox):
 
 def split_bbox_into_grid(bbox_reprojected, grid_size):
     """Split a projected bounding box into a grid of smaller cells."""
-    grid_path = os.path.join(DATA_DIR, f'cardiff_grid_cells_{grid_size}m.geojson')
+    grid_path = os.path.join(INPUT_DATA_DIR, f'cardiff_grid_cells_{grid_size}m.geojson')
     if os.path.exists(grid_path):
         logging.info("Cardiff grid cells GeoJSON already exists. Loading from file...")
         gdf = gpd.read_file(grid_path)
@@ -97,7 +107,7 @@ def find_nearest_boundary_node(G, boundary):
 
 def get_park_boundary_nodes(G):
     """Loads parks from local GeoJSON and maps their boundaries to network nodes."""
-    park_path = os.path.join(DATA_DIR, 'dissolved_parks2.geojson')
+    park_path = os.path.join(INPUT_DATA_DIR, 'dissolved_parks2.geojson')
     park_gdf = gpd.read_file(park_path).to_crs(TARGET_CRS)
     park_gdf['boundary'] = park_gdf.geometry.boundary
     logging.info("Mapping park boundary nodes (this may take a moment)...")
@@ -187,7 +197,7 @@ def get_shortest_centroid_route(G, start_node, features_gdf, cache):
 # MAIN
 # ==========================================
 
-def main(bbox, grid_size):
+def main(bbox, grid_size, github_actions):
     # Initialize Network and Grid
     G = get_street_network_graph(bbox)
     bbox_reprojected = reproject_bbox(bbox)
@@ -219,10 +229,21 @@ def main(bbox, grid_size):
     logging.getLogger().setLevel(logging.DEBUG)
 
     # Export results
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    output_path = os.path.join(DATA_DIR, f'grid_cells_accessibility_{timestamp}.geojson')
-    grid_cells_gdf.to_file(output_path, driver='GeoJSON')
-    print(f"\nSuccess! Results saved to {output_path}")
+    if github_actions:
+        run_output_dir = OUTPUT_DATA_DIR
+    else:
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        run_output_dir = os.path.join(OUTPUT_DATA_DIR, timestamp)
+        os.makedirs(run_output_dir, exist_ok=True)
+
+    grid_cells_gdf.to_file(os.path.join(run_output_dir, 'grid_cells_accessibility.geojson'), driver='GeoJSON')
+    
+    # Save features used with the distance file in the same folder
+    parks_gdf.drop(columns=['boundary'], errors='ignore').to_file(os.path.join(run_output_dir, 'parks.geojson'), driver='GeoJSON')
+    gps_gdf.drop(columns=['centroid'], errors='ignore').to_file(os.path.join(run_output_dir, 'gps.geojson'), driver='GeoJSON')
+    schools_gdf.drop(columns=['centroid'], errors='ignore').to_file(os.path.join(run_output_dir, 'schools.geojson'), driver='GeoJSON')
+
+    print(f"\nSuccess! Results saved to {run_output_dir}")
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
@@ -230,5 +251,12 @@ if __name__ == "__main__":
     # Cardiff city centre bbox for testing (west, south, east, north)
     cardiff_bbox = (-3.21, 51.49, -3.16, 51.51)
     grid_size_meters = 100
+
+
+    # let the user know where the script thinks it's running
+    if os.environ.get('GITHUB_ACTIONS') == 'true':
+        print("Running in GitHub Actions!")
+    else:
+        print("Running locally!")
 
     main(cardiff_bbox, grid_size_meters)
