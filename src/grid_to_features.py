@@ -12,10 +12,9 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 
 if os.environ.get('GITHUB_ACTIONS') == 'true':
     # ! Find how to get github actions to access the parks data
-    INPUT_DATA_DIR = os.path.join(os.getcwd(), 'data')
+    INPUT_DATA_DIR = os.path.join(os.getcwd())
     
-    # ! Find how to get it to make a new file and output the files there
-    OUTPUT_DATA_DIR = os.path.join(os.getcwd(), 'data')
+    OUTPUT_DATA_DIR = os.path.join(os.getcwd())
 else:
     INPUT_DATA_DIR = os.path.join(SCRIPT_DIR, '../data/input_data')
     OUTPUT_DATA_DIR = os.path.join(SCRIPT_DIR, '../output')
@@ -107,7 +106,7 @@ def find_nearest_boundary_node(G, boundary):
 
 def get_park_boundary_nodes(G):
     """Loads parks from local GeoJSON and maps their boundaries to network nodes."""
-    park_path = os.path.join(INPUT_DATA_DIR, 'dissolved_parks2.geojson')
+    park_path = os.path.join(INPUT_DATA_DIR, 'cardiff_parks.geojson')
     park_gdf = gpd.read_file(park_path).to_crs(TARGET_CRS)
     park_gdf['boundary'] = park_gdf.geometry.boundary
     logging.info("Mapping park boundary nodes (this may take a moment)...")

@@ -1,5 +1,6 @@
 cache/
 .venv/
 geopackages/
-*.gpkg
-data/
+output/
+cardiff_grid_cells_100m.geojson
+cardiff_network.graphml
