@@ -1,7 +1,6 @@
 # imported park data from 'dissolved_parks2.geojson'
 
 import osmnx as ox
-import matplotlib.pyplot as plt
 from shapely.geometry import Point, box
 import geopandas as gpd
 import networkx as nx
@@ -86,38 +85,6 @@ def split_bbox_into_grid(bbox, grid_size):
         return grid_gdf
 
 
-def assign_nodes_to_grid_cells(G, grid_gdf):
-    """
-    Find which nodes from the street network graph fall within each grid cell.
-
-    Args:
-        G: NetworkX graph from OSMnx (projected to EPSG:27700)
-        grid_gdf: GeoDataFrame of grid cells (in EPSG:27700)
-
-    Returns:
-        grid_gdf with a new 'nodes' column containing list of node IDs in each cell
-    """
-    nodes_data = []
-    for node, data in G.nodes(data=True):
-        nodes_data.append({
-            'node_id': node,
-            'geometry': Point(data['x'], data['y'])
-        })
-
-    nodes_gdf = gpd.GeoDataFrame(nodes_data, crs=TARGET_CRS)
-
-    nodes_with_grid = gpd.sjoin(nodes_gdf, grid_gdf, how='left', predicate='within')
-
-    grid_gdf['nodes'] = None
-    for grid_id in grid_gdf['grid_id']:
-        nodes_in_cell = nodes_with_grid[nodes_with_grid['grid_id'] == grid_id]['node_id'].tolist()
-        grid_gdf.at[grid_gdf[grid_gdf['grid_id'] == grid_id].index[0], 'nodes'] = nodes_in_cell
-
-    grid_gdf['node_count'] = grid_gdf['nodes'].apply(lambda x: len(x) if x else 0)
-
-    return grid_gdf
-
-
 def find_nearest_boundary_node(G, boundary):
     """Find the network node nearest to any point on the park boundary.
     Both the graph and boundary must be in EPSG:27700.
@@ -178,6 +145,10 @@ def get_nearest_node_from_array(G, start_node_id, candidate_nodes):
 
 def get_shortest_park_route(G, start_node, features_gdf, cache=None):
     """start_node must be a shapely Point in EPSG:27700."""
+    # If the point is inside the park boundary, distance is 0
+    if features_gdf.contains(start_node).any():
+        return 0.0
+
     if cache is None:
         cache = {}
 
@@ -242,7 +213,7 @@ def reproject_bbox(bbox):
     return bbox_reprojected
 
 
-def main(bbox, grid_size, tags, feature_name):
+def main(bbox, grid_size, column_name):
     G = get_street_network_graph(bbox)
 
     # Confirm graph is in EPSG:27700
@@ -258,7 +229,7 @@ def main(bbox, grid_size, tags, feature_name):
     sample_centroid = grid_cells_gdf.geometry.iloc[0].centroid
     logging.info(f"Grid sample centroid: {sample_centroid.x:.2f}, {sample_centroid.y:.2f}")
 
-    grid_cells_gdf[feature_name] = float('nan')
+    grid_cells_gdf[column_name] = float('nan')
 
     features_gdf = get_park_boundary_nodes(G)
 
@@ -285,15 +256,16 @@ def __main__():
         format='%(levelname)s:%(asctime)s - %(message)s'
     )
 
-    # (west longitude, south latitude, east longitude, north latitude)
-    cardiff_bbox_lat_long = (-3.35, 51.37, -3.05, 51.57)
+    column_name = 'nearest_park'
 
-    feature_tags = {"landuse": ["recreation_ground", "grass"]}
-    feature_name = 'nearest_park'
+    # (west longitude, south latitude, east longitude, north latitude)
+    # cardiff_bbox_lat_long = (-3.35, 51.37, -3.05, 51.57)
+
+    cardiff_bbox_lat_long = (-3.21, 51.49, -3.16, 51.51)
 
     grid_size = 100
 
-    main(cardiff_bbox_lat_long, grid_size, feature_tags, feature_name)
+    main(cardiff_bbox_lat_long, grid_size, column_name)
 
 
 if __name__ == "__main__":
