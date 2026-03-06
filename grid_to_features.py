@@ -6,20 +6,23 @@ import os
 from datetime import datetime
 from tqdm import tqdm
 import logging
+import multiprocessing
 
 # Set up paths relative to script location
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 
-if os.environ.get('GITHUB_ACTIONS') == 'true':
-    # ! Find how to get github actions to access the parks data
-    INPUT_DATA_DIR = os.path.join(os.getcwd())
-    
-    OUTPUT_DATA_DIR = os.path.join(os.getcwd())
-    # GitHub Actions runs from repo root
+if os.environ.get('INPUT_DATA_DIR'):
+    INPUT_DATA_DIR = os.environ.get('INPUT_DATA_DIR')
+elif os.environ.get('GITHUB_ACTIONS') == 'true':
     INPUT_DATA_DIR = os.path.join(os.getcwd(), 'data', 'input_data')
-    OUTPUT_DATA_DIR = os.path.join(os.getcwd(), 'data')
 else:
     INPUT_DATA_DIR = os.path.join(SCRIPT_DIR, '../data/input_data')
+
+if os.environ.get('OUTPUT_DATA_DIR'):
+    OUTPUT_DATA_DIR = os.environ.get('OUTPUT_DATA_DIR')
+elif os.environ.get('GITHUB_ACTIONS') == 'true':
+    OUTPUT_DATA_DIR = os.path.join(os.getcwd(), 'data')
+else:
     OUTPUT_DATA_DIR = os.path.join(SCRIPT_DIR, '../output')
 
 os.makedirs(INPUT_DATA_DIR, exist_ok=True)
