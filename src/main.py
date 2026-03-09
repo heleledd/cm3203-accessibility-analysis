@@ -1,28 +1,50 @@
 import os
-import geopandas as gpd
 from tqdm import tqdm
 from datetime import datetime
 import multiprocessing
 import logging
+import math
+import concurrent.futures
 
 from config import (
     CARDIFF_BBOX,
     GRID_SIZE_METERS,
     OUTPUT_DATA_DIR,
     PARK_BOUNDARY_PATH,
-    PARK_ACCESS_POINTS_PATH
+    PARK_ACCESS_POINTS_PATH,
+    NUM_WORKERS
 )
 
 from network_and_bbox import get_street_network_graph, reproject_bbox, split_bbox_into_grid
-from amenities import get_park_boundary_nodes, get_osm_features
+from amenities import get_park_data, get_osm_features
 from shortest_route import get_shortest_route
+
+def process_chunk(args):
+    # unpack from the tuple that was passed in (put together in chunk_args)
+    chunk_df, G, park_access, park_bounds, gps, schools = args 
+
+    results = []
+
+    # Each chunk gets its own local cache to avoid IPC locks/overhead
+    park_cache, gp_cache, school_cache = {}, {}, {}
+
+    for idx, row in chunk_df.iterrows():
+        centroid = row.geometry.centroid
+        
+        p_dist = get_shortest_route(G, centroid, park_access, park_cache, boundaries_gdf=park_bounds)
+        g_dist = get_shortest_route(G, centroid, gps, gp_cache)
+        s_dist = get_shortest_route(G, centroid, schools, school_cache, boundaries_gdf=schools)
+        
+        results.append((idx, p_dist, g_dist, s_dist))
+        
+    return results
 
 def main(
         bbox=CARDIFF_BBOX,
         grid_size=GRID_SIZE_METERS,
         park_access_points_path=PARK_ACCESS_POINTS_PATH,
         park_boundary_path=PARK_BOUNDARY_PATH,
-        num_workers=None
+        num_workers=NUM_WORKERS
     ):
     
     # load street network
@@ -33,7 +55,7 @@ def main(
     grid_cells_gdf = split_bbox_into_grid(bbox_reprojected, grid_size)
 
     # load amenity features
-    park_access_points_gdf, park_boundaries_gdf = get_park_boundary_nodes(G, park_access_points_path, park_boundary_path)
+    park_access_points_gdf, park_boundaries_gdf = get_park_data(G, park_access_points_path, park_boundary_path)
     gps_gdf = get_osm_features(G, bbox, tags={"amenity": "doctors"})
     schools_gdf = get_osm_features(G, bbox, tags={"amenity": "school"})
 
@@ -42,27 +64,39 @@ def main(
     grid_cells_gdf['nearest_gp'] = float('nan')
     grid_cells_gdf['nearest_school'] = float('nan')
 
-    park_cache, gp_cache, school_cache = {}, {}, {}
-
     # for cleaner tqdm output
     logging.getLogger().setLevel(logging.WARNING)
 
-    # TODO: add multiprocessing here
-    # Main processing loop
-    for idx, row in tqdm(grid_cells_gdf.iterrows(), total=len(grid_cells_gdf), desc="Routing from grid cells"):
-        centroid = row.geometry.centroid
+    logging.info(f"Starting multiprocessing with {num_workers} cores...")
 
-        grid_cells_gdf.at[idx, 'nearest_park'] = get_shortest_route(
-            G, centroid, park_access_points_gdf, park_cache, boundaries_gdf=park_boundaries_gdf
-            )
-        
-        grid_cells_gdf.at[idx, 'nearest_gp'] = get_shortest_route(
-            G, centroid, gps_gdf, gp_cache
-            )
-        
-        grid_cells_gdf.at[idx, 'nearest_school'] = get_shortest_route(
-            G, centroid, schools_gdf, school_cache, boundaries_gdf=schools_gdf
-            )
+    # split the grid cells dataframe into chunks 
+    num_chunks = num_workers * 4
+    chunk_size = math.ceil(len(grid_cells_gdf) / num_chunks)
+    
+    chunks = [
+        grid_cells_gdf.iloc[i : i + chunk_size] 
+        for i in range(0, len(grid_cells_gdf), chunk_size)
+    ]
+
+    # prepare the inputs for the worker
+    chunk_args = [
+        (chunk, G, park_access_points_gdf, park_boundaries_gdf, gps_gdf, schools_gdf) 
+        for chunk in chunks
+    ]
+
+    all_results = []
+    with concurrent.futures.ProcessPoolExecutor(max_workers=num_workers) as executor:
+        futures = [executor.submit(process_chunk, arg) for arg in chunk_args]
+
+        for future in tqdm(concurrent.futures.as_completed(futures), total=len(futures), desc="Processing Grid Chunks"):
+            all_results.extend(future.result())
+    
+    # Map the gathered results back to the original dataframe
+    for idx, p_dist, g_dist, s_dist in all_results:
+        grid_cells_gdf.at[idx, 'nearest_park'] = p_dist
+        grid_cells_gdf.at[idx, 'nearest_gp'] = g_dist
+        grid_cells_gdf.at[idx, 'nearest_school'] = s_dist
+
 
     logging.getLogger().setLevel(logging.DEBUG)
 
@@ -73,9 +107,9 @@ def main(
     grid_cells_gdf.to_file(os.path.join(run_output_dir, 'grid_cells_accessibility.geojson'), driver='GeoJSON')
     
     # Save features used with the distance file in the same folder
-    park_boundaries_gdf.to_file(os.path.join(run_output_dir, 'parks.geojson'), driver='GeoJSON')
-    gps_gdf.drop(columns=['centroid'], errors='ignore').to_file(os.path.join(run_output_dir, 'gps.geojson'), driver='GeoJSON')
-    schools_gdf.drop(columns=['centroid'], errors='ignore').to_file(os.path.join(run_output_dir, 'schools.geojson'), driver='GeoJSON')
+    park_boundaries_gdf.to_file(os.path.join(run_output_dir, 'park.geojson'), driver='GeoJSON')
+    gps_gdf.drop(columns=['centroid'], errors='ignore').to_file(os.path.join(run_output_dir, 'gp.geojson'), driver='GeoJSON')
+    schools_gdf.drop(columns=['centroid'], errors='ignore').to_file(os.path.join(run_output_dir, 'school.geojson'), driver='GeoJSON')
 
     print(f"\nSuccess! Results saved to {run_output_dir}")
 
@@ -84,4 +118,3 @@ def main(
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
     main()
-    # TODO: Run the entire script!

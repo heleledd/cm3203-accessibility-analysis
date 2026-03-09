@@ -5,7 +5,6 @@ import geopandas as gpd
 
 from config import TARGET_CRS
 
-#     park_gdf['boundary'] = park_gdf.geometry.boundary
 
 def get_park_data(G, access_points_path, boundaries_path):
     """Loads parks access points and boundaries from local .geojson file"""
@@ -14,7 +13,10 @@ def get_park_data(G, access_points_path, boundaries_path):
     # read in the access points
     park_access_points_gdf = gpd.read_file(access_points_path).to_crs(TARGET_CRS)
 
-    # Edit the geopandas dataframe so that the nearest node in the street network to each park entrance is already calculated
+    # drop any rows where the geometry is null/missing
+    park_access_points_gdf = park_access_points_gdf.dropna(subset=['geometry'])
+
+    # calculate nearest node in the street network to each park entrance and store in dataframe
     park_access_points_gdf['nearest_node'] = ox.distance.nearest_nodes(
         G, 
         X=park_access_points_gdf.geometry.x, 
