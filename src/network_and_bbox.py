@@ -1,6 +1,5 @@
 import os
 import logging
-
 import osmnx as ox
 from shapely.geometry import Point, box
 import geopandas as gpd
@@ -27,6 +26,7 @@ def get_street_network_graph(bbox):
         G_proj = ox.projection.project_graph(G, to_crs=TARGET_CRS)
         ox.save_graphml(G_proj, filepath=network_path)
         return G_proj
+
 
 def reproject_bbox(bbox):
     """Reproject a WGS84 bounding box to EPSG:27700."""
