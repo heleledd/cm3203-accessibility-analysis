@@ -6,7 +6,7 @@ on:
       bbox:
         description: 'Bounding box in WGS84 (west, south, east, north)'
         required: true
-        default: '(-3.196, 51.494, -3.180, 51.500)'
+        default: '-3.196, 51.494, -3.180, 51.500'
         type: string
       park_access_points_file:
         description: 'Filename for access points (must be in data/input_data/)'
@@ -45,6 +45,10 @@ jobs:
           pip install -r requirements.txt
 
       - name: Run analysis script
+        env:
+            BBOX: ${{ inputs.bbox }}
+            ACCESS_POINTS_FILE: ${{ inputs.park_access_points_file }}
+            BOUNDARY_FILE: ${{ inputs.park_boundary_file }}
         run: python src/main.py
 
       - name: Upload results
