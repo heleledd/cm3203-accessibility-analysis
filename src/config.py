@@ -4,6 +4,7 @@ TARGET_CRS = 'EPSG:27700'
 
 # Cardiff bounding box (west, south, east, north) in WGS84
 # CARDIFF_BBOX = (-3.278, 51.447, -3.066, 51.554) # coordinates for all of Cardiff
+# BRISTOL_BBOX = (-2.712, 51.394, -2.443, 51.557)
 # CARDIFF_BBOX = (-3.196, 51.494, -3.180, 51.500) # smaller box for testing
 
 CITY = os.environ.get('CITY', 'Cardiff, Wales, UK')
