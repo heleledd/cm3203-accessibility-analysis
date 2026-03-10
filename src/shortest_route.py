@@ -1,7 +1,7 @@
 import networkx as nx
 import osmnx as ox
 
-def get_shortest_route(G, start_point, target_gdf, cache, boundaries_gdf=None, k_nearest=3):
+def get_shortest_route(G, start_point, target_gdf, cache, boundaries_gdf=None, start_node_id=None, k_nearest=3):
     """
     Unified routing function for Parks, GPs, and Schools.
     
@@ -18,14 +18,19 @@ def get_shortest_route(G, start_point, target_gdf, cache, boundaries_gdf=None, k
             return 0.0
 
     # get nearest network node and check cache
-    nearest_node_id = ox.distance.nearest_nodes(G, start_point.x, start_point.y)
+    if start_node_id is None:
+        nearest_node_id = ox.distance.nearest_nodes(G, start_point.x, start_point.y)
+    else:
+        nearest_node_id = start_node_id
     
     if nearest_node_id in cache:
         return cache[nearest_node_id]
 
-    # find the nearest target destinations using straight-line distance (target_gdf contains 'Point' geometry type)
-    target_gdf['_temp_dist'] = target_gdf.geometry.distance(start_point)
-    nearest_targets = target_gdf.sort_values('_temp_dist').head(k_nearest)
+    # find the nearest target destinations using straight-line distance using an R-Tree
+    nearest_indices = target_gdf.sindex.nearest(start_point, return_all=False)[1]
+
+    # Get only the nearest rows, up to k_nearest
+    nearest_targets = target_gdf.iloc[nearest_indices].head(k_nearest)
 
     # attempt routing
     distances = []

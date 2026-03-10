@@ -1,22 +1,33 @@
-FROM python:3.10-slim
+# Use an official lightweight Python image with Conda installed
+FROM mambaorg/micromamba:1.5.1
 
-# Install system dependencies required for geospatial libraries (GDAL, etc.)
-RUN apt-get update && apt-get install -y \
-    gdal-bin \
-    libgdal-dev \
-    g++ \
-    && rm -rf /var/lib/apt/lists/*
-
+# Set the working directory
 WORKDIR /app
 
-# Install python dependencies
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# Copy the environment definition (if you have an environment.yml)
+# Or install dependencies directly. 
+# It is safer to install osmnx and geopandas via conda than pip.
+RUN micromamba install -y -n base -c conda-forge \
+    python=3.9 \
+    osmnx \
+    geopandas \
+    networkx \
+    tqdm \
+    scipy \
+    && micromamba clean --all --yes
 
-# Copy source code
+# Activate the environment
+ARG MAMBA_DOCKERFILE_ACTIVATE=1
+
+# Copy your source code
 COPY src/ ./src/
 
-# Set python path
-ENV PYTHONPATH=/app
+# Create data directories (to be mounted as volumes)
+RUN mkdir -p data/input_data data/output
 
-CMD ["python", "src/grid_to_features.py"]
+# Set environment variables
+ENV PYTHONPATH=/app/src
+ENV NUM_WORKERS=4
+
+# Run the application
+CMD ["python", "src/main.py"]

@@ -1,10 +1,10 @@
 import os
 from tqdm import tqdm
 from datetime import datetime
-import multiprocessing
 import logging
 import math
 import concurrent.futures
+import osmnx as ox
 
 from config import (
     CARDIFF_BBOX,
@@ -28,12 +28,16 @@ def process_chunk(args):
     # Each chunk gets its own local cache to avoid IPC locks/overhead
     park_cache, gp_cache, school_cache = {}, {}, {}
 
-    for idx, row in chunk_df.iterrows():
+    # Pre-calculate nearest nodes for all centroids in the chunk to avoid rebuilding the spatial index repeatedly
+    centroids = chunk_df.geometry.centroid
+    nearest_nodes = ox.distance.nearest_nodes(G, centroids.x.values, centroids.y.values)
+
+    for (idx, row), start_node in zip(chunk_df.iterrows(), nearest_nodes):
         centroid = row.geometry.centroid
         
-        p_dist = get_shortest_route(G, centroid, park_access, park_cache, boundaries_gdf=park_bounds)
-        g_dist = get_shortest_route(G, centroid, gps, gp_cache)
-        s_dist = get_shortest_route(G, centroid, schools, school_cache, boundaries_gdf=schools)
+        p_dist = get_shortest_route(G, centroid, park_access, park_cache, boundaries_gdf=park_bounds, start_node_id=start_node)
+        g_dist = get_shortest_route(G, centroid, gps, gp_cache, start_node_id=start_node)
+        s_dist = get_shortest_route(G, centroid, schools, school_cache, boundaries_gdf=schools, start_node_id=start_node)
         
         results.append((idx, p_dist, g_dist, s_dist))
         

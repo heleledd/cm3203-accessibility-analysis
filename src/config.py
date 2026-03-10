@@ -3,7 +3,7 @@ import os
 TARGET_CRS = 'EPSG:27700'
 
 # how many threads for multiprocessing
-NUM_WORKERS = 4
+NUM_WORKERS = int(os.getenv('NUM_WORKERS', 4))
 
 # Cardiff bounding box (west, south, east, north) in WGS84
 # CARDIFF_BBOX = (-3.35, 51.37, -3.05, 51.57) # coordinates for all of Cardiff

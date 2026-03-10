@@ -21,7 +21,7 @@ def get_street_network_graph(bbox):
         return G
     else:
         logging.info("Street network graph not found. Downloading from OpenStreetMap...")
-        G = ox.graph_from_bbox(bbox, network_type="walk", simplify=False, retain_all=False)
+        G = ox.graph_from_bbox(bbox, network_type="walk", simplify=True, retain_all=False)
         ox.distance.add_edge_lengths(G)
         G_proj = ox.projection.project_graph(G, to_crs=TARGET_CRS)
         ox.save_graphml(G_proj, filepath=network_path)
