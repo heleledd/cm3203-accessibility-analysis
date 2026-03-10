@@ -9,7 +9,6 @@ from config import (
     OUTPUT_DATA_DIR,
     PARK_BOUNDARY_PATH,
     PARK_ACCESS_POINTS_PATH,
-    NUM_WORKERS
 )
 
 from network_and_bbox import get_street_network_graph, reproject_bbox, split_bbox_into_grid
@@ -21,7 +20,6 @@ def main(
         grid_size=GRID_SIZE_METERS,
         park_access_points_path=PARK_ACCESS_POINTS_PATH,
         park_boundary_path=PARK_BOUNDARY_PATH,
-        num_workers=NUM_WORKERS
     ):
     
     # load street network
