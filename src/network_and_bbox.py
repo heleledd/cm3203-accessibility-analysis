@@ -20,7 +20,6 @@ def get_street_network_graph(bbox):
     edge_path = os.path.join(INPUT_DATA_DIR, 'street_network_edges.csv')
     
     # --- AUTO-PURGE OLD CACHE ---
-    # We are changing how the CSV is saved, so we must delete the old ones.
     if os.path.exists(node_path):
         check_nodes = pd.read_csv(node_path, nrows=5)
         # If the old 'osmid' index is still in the file, delete it
@@ -55,11 +54,10 @@ def get_street_network_graph(bbox):
         nodes = nodes.reset_index(drop=True)
         
         # Save without an index!
-        nodes.to_csv(node_path, index=False)
-        edges.to_csv(edge_path, index=False)
+        # nodes.to_csv(node_path, index=False)
+        # edges.to_csv(edge_path, index=False)
         
-    # --- THE FINAL FIX: PURE DATA ---
-    # We enforce strict 32-bit ints and 64-bit floats on raw Series
+    # enforce strict 32-bit ints and 64-bit floats on raw Series
     
     x = nodes['x'].astype(np.float64)
     y = nodes['y'].astype(np.float64)
@@ -116,5 +114,5 @@ def split_bbox_into_grid(bbox_reprojected, grid_size):
             x += grid_size
 
         grid_gdf = gpd.GeoDataFrame(grid_cells, crs=TARGET_CRS)
-        grid_gdf.to_file(grid_path, driver="GeoJSON")
+        # grid_gdf.to_file(grid_path, driver="GeoJSON")
         return grid_gdf

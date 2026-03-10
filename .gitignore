@@ -5,6 +5,4 @@ output/
 cardiff_grid_cells_100m.geojson
 cardiff_network.graphml
 bristol_greenspace_access_points.geojson
-cardiff_greenspace_access_points.geojson
-cardiff_greenspace_sites.geojson
 __pycache__
