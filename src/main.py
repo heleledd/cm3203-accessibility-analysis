@@ -1,10 +1,6 @@
 import os
-from tqdm import tqdm
 from datetime import datetime
 import logging
-import math
-import concurrent.futures
-import osmnx as ox
 import geopandas as gpd
 
 from config import (
