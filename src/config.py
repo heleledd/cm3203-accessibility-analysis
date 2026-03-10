@@ -6,9 +6,9 @@ TARGET_CRS = 'EPSG:27700'
 NUM_WORKERS = int(os.getenv('NUM_WORKERS', 4))
 
 # Cardiff bounding box (west, south, east, north) in WGS84
-# CARDIFF_BBOX = (-3.35, 51.37, -3.05, 51.57) # coordinates for all of Cardiff
+CARDIFF_BBOX = (-3.35, 51.37, -3.05, 51.57) # coordinates for all of Cardiff
 
-CARDIFF_BBOX = (-3.196, 51.494, -3.180, 51.500) # smaller box for testing
+# CARDIFF_BBOX = (-3.196, 51.494, -3.180, 51.500) # smaller box for testing
 
 GRID_SIZE_METERS = 100
 
