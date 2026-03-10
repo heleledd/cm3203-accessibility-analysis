@@ -2,6 +2,7 @@ import os
 from datetime import datetime
 import logging
 import geopandas as gpd
+import osmnx as ox
 
 from config import (
     CARDIFF_BBOX,
@@ -9,6 +10,8 @@ from config import (
     OUTPUT_DATA_DIR,
     PARK_BOUNDARY_PATH,
     PARK_ACCESS_POINTS_PATH,
+    TARGET_CRS,
+    CITY
 )
 
 from network_and_bbox import get_street_network_graph, reproject_bbox, split_bbox_into_grid
@@ -72,6 +75,22 @@ def main(
     schools_intersect = gpd.sjoin(centroids_gdf, schools_gdf, how='inner', predicate='intersects')
     grid_cells_gdf.loc[schools_intersect.index, 'nearest_school'] = 0.0
 
+    logging.info("Fetching Cardiff administrative boundary to filter water cells...")
+
+
+    # Get rid of grid cells which are actually in the sea
+    # download the official city boundary polygon from OpenStreetMap
+    cardiff_boundary = ox.geocode_to_gdf(CITY)
+
+    # project the boundary to match the target_crs
+    cardiff_boundary = cardiff_boundary.to_crs(TARGET_CRS)
+
+    # clip the grid cells so only the ones inside the land boundary remain
+    logging.info(f"Grid cells before filtering: {len(grid_cells_gdf)}")
+    grid_cells_gdf = gpd.clip(grid_cells_gdf, cardiff_boundary)
+    logging.info(f"Grid cells after filtering: {len(grid_cells_gdf)}")
+
+
     logging.info("Saving results...")
     logging.getLogger().setLevel(logging.DEBUG)
 
@@ -87,7 +106,6 @@ def main(
     schools_gdf.drop(columns=['centroid'], errors='ignore').to_file(os.path.join(run_output_dir, 'school.geojson'), driver='GeoJSON')
 
     print(f"\nSuccess! Results saved to {run_output_dir}")
-
 
 
 if __name__ == '__main__':

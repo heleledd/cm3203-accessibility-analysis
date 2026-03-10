@@ -8,6 +8,11 @@ on:
         required: true
         default: '-3.196, 51.494, -3.180, 51.500'
         type: string
+      city:
+        description: 'Which city is being analysed'
+        required: true
+        default: 'Cardiff, Wales, UK'
+        type: string
       park_access_points_file:
         description: 'Filename for access points (must be in data/input_data/)'
         required: true

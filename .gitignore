@@ -2,7 +2,4 @@ cache/
 .venv/
 geopackages/
 output/
-cardiff_grid_cells_100m.geojson
-cardiff_network.graphml
-bristol_greenspace_access_points.geojson
 __pycache__
