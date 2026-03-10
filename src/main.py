@@ -1,9 +1,7 @@
 import os
-from tqdm import tqdm
 from datetime import datetime
 import logging
-import math
-import concurrent.futures
+import geopandas as gpd
 import osmnx as ox
 
 from config import (
@@ -12,96 +10,88 @@ from config import (
     OUTPUT_DATA_DIR,
     PARK_BOUNDARY_PATH,
     PARK_ACCESS_POINTS_PATH,
-    NUM_WORKERS
+    TARGET_CRS,
+    CITY
 )
 
 from network_and_bbox import get_street_network_graph, reproject_bbox, split_bbox_into_grid
 from amenities import get_park_data, get_osm_features
-from shortest_route import get_shortest_route
 
-def process_chunk(args):
-    # unpack from the tuple that was passed in (put together in chunk_args)
-    chunk_df, G, park_access, park_bounds, gps, schools = args 
-
-    results = []
-
-    # Each chunk gets its own local cache to avoid IPC locks/overhead
-    park_cache, gp_cache, school_cache = {}, {}, {}
-
-    # Pre-calculate nearest nodes for all centroids in the chunk to avoid rebuilding the spatial index repeatedly
-    centroids = chunk_df.geometry.centroid
-    nearest_nodes = ox.distance.nearest_nodes(G, centroids.x.values, centroids.y.values)
-
-    for (idx, row), start_node in zip(chunk_df.iterrows(), nearest_nodes):
-        centroid = row.geometry.centroid
-        
-        p_dist = get_shortest_route(G, centroid, park_access, park_cache, boundaries_gdf=park_bounds, start_node_id=start_node)
-        g_dist = get_shortest_route(G, centroid, gps, gp_cache, start_node_id=start_node)
-        s_dist = get_shortest_route(G, centroid, schools, school_cache, boundaries_gdf=schools, start_node_id=start_node)
-        
-        results.append((idx, p_dist, g_dist, s_dist))
-        
-    return results
 
 def main(
         bbox=CARDIFF_BBOX,
         grid_size=GRID_SIZE_METERS,
         park_access_points_path=PARK_ACCESS_POINTS_PATH,
         park_boundary_path=PARK_BOUNDARY_PATH,
-        num_workers=NUM_WORKERS
     ):
     
     # load street network
-    G = get_street_network_graph(bbox)
+    logging.info("Loading Pandana network...")
+    network = get_street_network_graph(bbox)
     
     # split the bounding box into a grid
     bbox_reprojected = reproject_bbox(bbox)
     grid_cells_gdf = split_bbox_into_grid(bbox_reprojected, grid_size)
 
     # load amenity features
-    park_access_points_gdf, park_boundaries_gdf = get_park_data(G, park_access_points_path, park_boundary_path)
-    gps_gdf = get_osm_features(G, bbox, tags={"amenity": "doctors"})
-    schools_gdf = get_osm_features(G, bbox, tags={"amenity": "school"})
+    park_access_points_gdf, park_boundaries_gdf = get_park_data(network, park_access_points_path, park_boundary_path)
+    gps_gdf = get_osm_features(network, bbox, tags={"amenity": "doctors"})
+    schools_gdf = get_osm_features(network, bbox, tags={"amenity": "school"})
 
-    # Setup columns in dataframe
-    grid_cells_gdf['nearest_park'] = float('nan')
-    grid_cells_gdf['nearest_gp'] = float('nan')
-    grid_cells_gdf['nearest_school'] = float('nan')
+    MAX_DIST = 5000 # 5km max search distance
+    logging.info("Attaching amenities to the network...")
 
-    # for cleaner tqdm output
-    logging.getLogger().setLevel(logging.WARNING)
+    network.set_pois('parks', MAX_DIST, 1, park_access_points_gdf.geometry.x, park_access_points_gdf.geometry.y)
+    network.set_pois('gps', MAX_DIST, 1, gps_gdf['centroid'].x, gps_gdf['centroid'].y)
+    network.set_pois('schools', MAX_DIST, 1, schools_gdf['centroid'].x, schools_gdf['centroid'].y)
 
-    logging.info(f"Starting multiprocessing with {num_workers} cores...")
-
-    # split the grid cells dataframe into chunks 
-    num_chunks = num_workers * 4
-    chunk_size = math.ceil(len(grid_cells_gdf) / num_chunks)
+    # map grid cells to network nodes
+    logging.info("Mapping grid cells to network nodes...")
+    centroids = grid_cells_gdf.geometry.centroid
     
-    chunks = [
-        grid_cells_gdf.iloc[i : i + chunk_size] 
-        for i in range(0, len(grid_cells_gdf), chunk_size)
-    ]
+    # Snapping grid cells using Pandana's vectorized method
+    grid_cells_gdf['nearest_node'] = network.get_node_ids(centroids.x, centroids.y)
 
-    # prepare the inputs for the worker
-    chunk_args = [
-        (chunk, G, park_access_points_gdf, park_boundaries_gdf, gps_gdf, schools_gdf) 
-        for chunk in chunks
-    ]
+    # calculate shortest routes for ALL grid cells instantly
+    logging.info("Calculating shortest routes with Pandana...")
+    park_dists = network.nearest_pois(MAX_DIST, 'parks', num_pois=1)
+    gp_dists = network.nearest_pois(MAX_DIST, 'gps', num_pois=1)
+    school_dists = network.nearest_pois(MAX_DIST, 'schools', num_pois=1)
 
-    all_results = []
-    with concurrent.futures.ProcessPoolExecutor(max_workers=num_workers) as executor:
-        futures = [executor.submit(process_chunk, arg) for arg in chunk_args]
+    # Map the distances back to the dataframe (column 1 represents the distance to the 1st nearest POI)
+    grid_cells_gdf['nearest_park'] = grid_cells_gdf['nearest_node'].map(park_dists[1])
+    grid_cells_gdf['nearest_gp'] = grid_cells_gdf['nearest_node'].map(gp_dists[1])
+    grid_cells_gdf['nearest_school'] = grid_cells_gdf['nearest_node'].map(school_dists[1])
 
-        for future in tqdm(concurrent.futures.as_completed(futures), total=len(futures), desc="Processing Grid Chunks"):
-            all_results.extend(future.result())
-    
-    # Map the gathered results back to the original dataframe
-    for idx, p_dist, g_dist, s_dist in all_results:
-        grid_cells_gdf.at[idx, 'nearest_park'] = p_dist
-        grid_cells_gdf.at[idx, 'nearest_gp'] = g_dist
-        grid_cells_gdf.at[idx, 'nearest_school'] = s_dist
+    # Check if any centroids are INSIDE a polygon e.g park or school
+    logging.info("Applying 0.0m distance for cells inside amenity boundaries...")
+    centroids_gdf = gpd.GeoDataFrame(geometry=centroids, crs=grid_cells_gdf.crs)
+
+    # Parks
+    parks_intersect = gpd.sjoin(centroids_gdf, park_boundaries_gdf, how='inner', predicate='intersects')
+    grid_cells_gdf.loc[parks_intersect.index, 'nearest_park'] = 0.0
+
+    # Schools
+    schools_intersect = gpd.sjoin(centroids_gdf, schools_gdf, how='inner', predicate='intersects')
+    grid_cells_gdf.loc[schools_intersect.index, 'nearest_school'] = 0.0
+
+    logging.info("Fetching Cardiff administrative boundary to filter water cells...")
 
 
+    # Get rid of grid cells which are actually in the sea
+    # download the official city boundary polygon from OpenStreetMap
+    cardiff_boundary = ox.geocode_to_gdf(CITY)
+
+    # project the boundary to match the target_crs
+    cardiff_boundary = cardiff_boundary.to_crs(TARGET_CRS)
+
+    # clip the grid cells so only the ones inside the land boundary remain
+    logging.info(f"Grid cells before filtering: {len(grid_cells_gdf)}")
+    grid_cells_gdf = gpd.clip(grid_cells_gdf, cardiff_boundary)
+    logging.info(f"Grid cells after filtering: {len(grid_cells_gdf)}")
+
+
+    logging.info("Saving results...")
     logging.getLogger().setLevel(logging.DEBUG)
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -116,7 +106,6 @@ def main(
     schools_gdf.drop(columns=['centroid'], errors='ignore').to_file(os.path.join(run_output_dir, 'school.geojson'), driver='GeoJSON')
 
     print(f"\nSuccess! Results saved to {run_output_dir}")
-
 
 
 if __name__ == '__main__':

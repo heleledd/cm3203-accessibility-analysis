@@ -2,6 +2,27 @@ name: Run Accessibility Analysis
 
 on:
   workflow_dispatch:
+    inputs:
+      bbox:
+        description: 'Bounding box in WGS84 (west, south, east, north)'
+        required: true
+        default: '-3.196, 51.494, -3.180, 51.500'
+        type: string
+      city:
+        description: 'Which city is being analysed'
+        required: true
+        default: 'Cardiff, Wales, UK'
+        type: string
+      park_access_points_file:
+        description: 'Filename for access points (must be in data/input_data/)'
+        required: true
+        default: 'cardiff_greenspace_access_points.geojson'
+        type: string
+      park_boundary_file:
+        description: 'Filename for park boundaries (must be in data/input_data/)'
+        required: true
+        default: 'cardiff_greenspace_sites.geojson'
+        type: string
 
 jobs:
   analysis:
@@ -29,11 +50,15 @@ jobs:
           pip install -r requirements.txt
 
       - name: Run analysis script
-        run: python src/grid_to_features.py
+        env:
+            BBOX: ${{ inputs.bbox }}
+            ACCESS_POINTS_FILE: ${{ inputs.park_access_points_file }}
+            BOUNDARY_FILE: ${{ inputs.park_boundary_file }}
+        run: python src/main.py
 
       - name: Upload results
         uses: actions/upload-artifact@v4
         with:
           name: accessibility-results
-          path: data/output/*.geojson
+          path: data/output/
           if-no-files-found: warn
