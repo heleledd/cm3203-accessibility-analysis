@@ -90,20 +90,24 @@ def main(
     grid_cells_gdf = gpd.clip(grid_cells_gdf, cardiff_boundary)
     logging.info(f"Grid cells after filtering: {len(grid_cells_gdf)}")
 
+    # Change the crs to lat/long so it can be visualised
+    grid_cells_gdf = grid_cells_gdf.to_crs('EPSG:4326')
 
+
+    # Save the results
     logging.info("Saving results...")
     logging.getLogger().setLevel(logging.DEBUG)
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    run_output_dir = os.path.join(OUTPUT_DATA_DIR, timestamp)
+    run_output_dir = os.path.join(OUTPUT_DATA_DIR, f"{CITY.split(',')[0]}_{timestamp}")
     os.makedirs(run_output_dir, exist_ok=True)
 
     grid_cells_gdf.to_file(os.path.join(run_output_dir, 'grid_cells_accessibility.geojson'), driver='GeoJSON')
     
     # Save features used with the distance file in the same folder
-    park_boundaries_gdf.to_file(os.path.join(run_output_dir, 'park.geojson'), driver='GeoJSON')
-    gps_gdf.drop(columns=['centroid'], errors='ignore').to_file(os.path.join(run_output_dir, 'gp.geojson'), driver='GeoJSON')
-    schools_gdf.drop(columns=['centroid'], errors='ignore').to_file(os.path.join(run_output_dir, 'school.geojson'), driver='GeoJSON')
+    park_boundaries_gdf.to_crs('EPSG:4326').to_file(os.path.join(run_output_dir, 'park.geojson'), driver='GeoJSON')
+    gps_gdf.drop(columns=['centroid'], errors='ignore').to_crs('EPSG:4326').to_file(os.path.join(run_output_dir, 'gp.geojson'), driver='GeoJSON')
+    schools_gdf.drop(columns=['centroid'], errors='ignore').to_crs('EPSG:4326').to_file(os.path.join(run_output_dir, 'school.geojson'), driver='GeoJSON')
 
     print(f"\nSuccess! Results saved to {run_output_dir}")
 
