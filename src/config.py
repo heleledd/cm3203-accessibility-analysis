@@ -9,7 +9,7 @@ TARGET_CRS = 'EPSG:27700'
 
 CITY = os.environ.get('CITY', 'Cardiff, Wales, UK')
 
-bbox_string = os.environ.get('BBOX', '-3.196, 51.494, -3.180, 51.500')
+bbox_string = os.environ.get('BBOX', '-3.278, 51.447, -3.066, 51.554')
 CARDIFF_BBOX = tuple(float(coord.strip()) for coord in bbox_string.split(','))
 
 GRID_SIZE_METERS = 100
@@ -24,3 +24,21 @@ boundary_filename = os.environ.get('BOUNDARY_FILE', 'cardiff_greenspace_sites.ge
 
 PARK_ACCESS_POINTS_PATH = os.path.join(INPUT_DATA_DIR, access_points_filename)
 PARK_BOUNDARY_PATH = os.path.join(INPUT_DATA_DIR, boundary_filename)
+
+OSM_AMENITIES_CONFIG = {
+        'gps': {
+            'tags': {"amenity": ["doctors", "pharmacy"]},
+            'check_intersection': False,
+            'filename': 'gp.geojson'
+        },
+        'schools': {
+            'tags': {"amenity": "school"},
+            'check_intersection': True,
+            'filename': 'school.geojson'
+        },
+        'supermarkets': {
+            'tags': {"shop": "supermarket"},
+            'check_intersection': True,
+            'filename': 'supermarket.geojson'
+        }
+    }

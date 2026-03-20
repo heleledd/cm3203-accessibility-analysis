@@ -11,7 +11,8 @@ from config import (
     PARK_BOUNDARY_PATH,
     PARK_ACCESS_POINTS_PATH,
     TARGET_CRS,
-    CITY
+    CITY,
+    OSM_AMENITIES_CONFIG
 )
 
 from network_and_bbox import get_street_network_graph, reproject_bbox, split_bbox_into_grid
@@ -34,9 +35,15 @@ def main(
     grid_cells_gdf = split_bbox_into_grid(bbox_reprojected, grid_size)
 
     # load amenity features
+    logging.info("Loading amenity features...")
+
     park_access_points_gdf, park_boundaries_gdf = get_park_data(network, park_access_points_path, park_boundary_path)
-    gps_gdf = get_osm_features(network, bbox, tags={"amenity": "doctors"})
+    
+    
+    gps_gdf = get_osm_features(network, bbox, tags={"amenity": ["doctors", "pharmacy"]})
     schools_gdf = get_osm_features(network, bbox, tags={"amenity": "school"})
+    supermarkets_gdf = get_osm_features(network, bbox, tags={"shop": "supermarket"})
+
 
     MAX_DIST = 5000 # 5km max search distance
     logging.info("Attaching amenities to the network...")
