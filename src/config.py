@@ -26,10 +26,10 @@ PARK_ACCESS_POINTS_PATH = os.path.join(INPUT_DATA_DIR, access_points_filename)
 PARK_BOUNDARY_PATH = os.path.join(INPUT_DATA_DIR, boundary_filename)
 
 OSM_AMENITIES_CONFIG = {
-        'gps': {
+        'gps_pharmacies': {
             'tags': {"amenity": ["doctors", "pharmacy"]},
             'check_intersection': False,
-            'filename': 'gp.geojson'
+            'filename': 'gp_pharmacies.geojson'
         },
         'schools': {
             'tags': {"amenity": "school"},
@@ -40,5 +40,20 @@ OSM_AMENITIES_CONFIG = {
             'tags': {"shop": "supermarket"},
             'check_intersection': True,
             'filename': 'supermarket.geojson'
+        },
+        'cafe': {
+            'tags': {"amenity": "cafe"},
+            'check_intersection': False,
+            'filename': 'cafe.geojson'
+        },
+        'leisure_centre': {
+            'tags': {"leisure": "fitness_centre"},
+            'check_intersection': True,
+            'filename': 'fitness_centre.geojson'
+        },
+        'nightclub': {
+            'tags': {"amenity": "nightclub"},
+            'check_intersection': False,
+            'filename': 'nightclub.geojson'
         }
     }

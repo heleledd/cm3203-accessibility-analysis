@@ -12,7 +12,7 @@ from config import (
     PARK_ACCESS_POINTS_PATH,
     TARGET_CRS,
     CITY,
-    OSM_AMENITIES_CONFIG
+    OSM_AMENITIES_CONFIG 
 )
 
 from network_and_bbox import get_street_network_graph, reproject_bbox, split_bbox_into_grid
@@ -34,65 +34,63 @@ def main(
     bbox_reprojected = reproject_bbox(bbox)
     grid_cells_gdf = split_bbox_into_grid(bbox_reprojected, grid_size)
 
-    # load amenity features
+    # LOAD ALL AMENITY DATA FROM THE CONFIG FILE
     logging.info("Loading amenity features...")
-
+    loaded_amenities = {}
+    
+    # Handle custom park data separately, but add it to our unified dictionary
     park_access_points_gdf, park_boundaries_gdf = get_park_data(network, park_access_points_path, park_boundary_path)
-    
-    
-    gps_gdf = get_osm_features(network, bbox, tags={"amenity": ["doctors", "pharmacy"]})
-    schools_gdf = get_osm_features(network, bbox, tags={"amenity": "school"})
-    supermarkets_gdf = get_osm_features(network, bbox, tags={"shop": "supermarket"})
+    loaded_amenities['parks'] = {
+        'gdf': park_boundaries_gdf,
+        'check_intersection': True,
+        'filename': 'park.geojson',
+        'poi_x': park_access_points_gdf.geometry.x,
+        'poi_y': park_access_points_gdf.geometry.y
+    }
 
+    # Loop through the config to load all OSM amenities dynamically
+    for name, config in OSM_AMENITIES_CONFIG.items():
+        logging.info(f"Fetching OSM data for {name}...")
+        gdf = get_osm_features(network, bbox, tags=config['tags'])
+        loaded_amenities[name] = {
+            'gdf': gdf,
+            'check_intersection': config['check_intersection'],
+            'filename': config['filename'],
+            'poi_x': gdf['centroid'].x,
+            'poi_y': gdf['centroid'].y
+        }
 
     MAX_DIST = 5000 # 5km max search distance
+    
+    # ATTACH AMENITIES TO NETWORK
     logging.info("Attaching amenities to the network...")
-
-    network.set_pois('parks', MAX_DIST, 1, park_access_points_gdf.geometry.x, park_access_points_gdf.geometry.y)
-    network.set_pois('gps', MAX_DIST, 1, gps_gdf['centroid'].x, gps_gdf['centroid'].y)
-    network.set_pois('schools', MAX_DIST, 1, schools_gdf['centroid'].x, schools_gdf['centroid'].y)
+    for name, data in loaded_amenities.items():
+        network.set_pois(name, MAX_DIST, 1, data['poi_x'], data['poi_y'])
 
     # map grid cells to network nodes
     logging.info("Mapping grid cells to network nodes...")
     centroids = grid_cells_gdf.geometry.centroid
-    
-    # Snapping grid cells using Pandana's vectorized method
     grid_cells_gdf['nearest_node'] = network.get_node_ids(centroids.x, centroids.y)
 
-    # calculate shortest routes for ALL grid cells instantly
+    # CALCULATE DISTANCES & MAP TO GRID
     logging.info("Calculating shortest routes with Pandana...")
-    park_dists = network.nearest_pois(MAX_DIST, 'parks', num_pois=1)
-    gp_dists = network.nearest_pois(MAX_DIST, 'gps', num_pois=1)
-    school_dists = network.nearest_pois(MAX_DIST, 'schools', num_pois=1)
+    for name in loaded_amenities.keys():
+        dists = network.nearest_pois(MAX_DIST, name, num_pois=1)
+        grid_cells_gdf[f'nearest_{name}'] = grid_cells_gdf['nearest_node'].map(dists[1])
 
-    # Map the distances back to the dataframe (column 1 represents the distance to the 1st nearest POI)
-    grid_cells_gdf['nearest_park'] = grid_cells_gdf['nearest_node'].map(park_dists[1])
-    grid_cells_gdf['nearest_gp'] = grid_cells_gdf['nearest_node'].map(gp_dists[1])
-    grid_cells_gdf['nearest_school'] = grid_cells_gdf['nearest_node'].map(school_dists[1])
-
-    # Check if any centroids are INSIDE a polygon e.g park or school
+    # APPLY 0.0m DISTANCE FOR CELLS INSIDE POLYGONS
     logging.info("Applying 0.0m distance for cells inside amenity boundaries...")
     centroids_gdf = gpd.GeoDataFrame(geometry=centroids, crs=grid_cells_gdf.crs)
 
-    # Parks
-    parks_intersect = gpd.sjoin(centroids_gdf, park_boundaries_gdf, how='inner', predicate='intersects')
-    grid_cells_gdf.loc[parks_intersect.index, 'nearest_park'] = 0.0
+    for name, data in loaded_amenities.items():
+        if data['check_intersection'] and data['gdf'] is not None and not data['gdf'].empty:
+            intersect = gpd.sjoin(centroids_gdf, data['gdf'], how='inner', predicate='intersects')
+            grid_cells_gdf.loc[intersect.index, f'nearest_{name}'] = 0.0
 
-    # Schools
-    schools_intersect = gpd.sjoin(centroids_gdf, schools_gdf, how='inner', predicate='intersects')
-    grid_cells_gdf.loc[schools_intersect.index, 'nearest_school'] = 0.0
-
+    # Filter water cells
     logging.info("Fetching Cardiff administrative boundary to filter water cells...")
-
-
-    # Get rid of grid cells which are actually in the sea
-    # download the official city boundary polygon from OpenStreetMap
-    cardiff_boundary = ox.geocode_to_gdf(CITY)
-
-    # project the boundary to match the target_crs
-    cardiff_boundary = cardiff_boundary.to_crs(TARGET_CRS)
-
-    # clip the grid cells so only the ones inside the land boundary remain
+    cardiff_boundary = ox.geocode_to_gdf(CITY).to_crs(TARGET_CRS)
+    
     logging.info(f"Grid cells before filtering: {len(grid_cells_gdf)}")
     grid_cells_gdf = gpd.clip(grid_cells_gdf, cardiff_boundary)
     logging.info(f"Grid cells after filtering: {len(grid_cells_gdf)}")
@@ -100,8 +98,7 @@ def main(
     # Change the crs to lat/long so it can be visualised
     grid_cells_gdf = grid_cells_gdf.to_crs('EPSG:4326')
 
-
-    # Save the results
+    # SAVE RESULTS
     logging.info("Saving results...")
     logging.getLogger().setLevel(logging.DEBUG)
 
@@ -111,10 +108,11 @@ def main(
 
     grid_cells_gdf.to_file(os.path.join(run_output_dir, 'grid_cells_accessibility.geojson'), driver='GeoJSON')
     
-    # Save features used with the distance file in the same folder
-    park_boundaries_gdf.to_crs('EPSG:4326').to_file(os.path.join(run_output_dir, 'park.geojson'), driver='GeoJSON')
-    gps_gdf.drop(columns=['centroid'], errors='ignore').to_crs('EPSG:4326').to_file(os.path.join(run_output_dir, 'gp.geojson'), driver='GeoJSON')
-    schools_gdf.drop(columns=['centroid'], errors='ignore').to_crs('EPSG:4326').to_file(os.path.join(run_output_dir, 'school.geojson'), driver='GeoJSON')
+    # Save feature files dynamically
+    for name, data in loaded_amenities.items():
+        if data['gdf'] is not None and not data['gdf'].empty:
+            clean_gdf = data['gdf'].drop(columns=['centroid'], errors='ignore').to_crs('EPSG:4326')
+            clean_gdf.to_file(os.path.join(run_output_dir, data['filename']), driver='GeoJSON')
 
     print(f"\nSuccess! Results saved to {run_output_dir}")
 
