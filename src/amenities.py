@@ -11,10 +11,16 @@ def get_park_data(network, access_points_path, boundaries_path):
     logging.info(f"Loading park data from {access_points_path} and {boundaries_path}...")
     
     # read in the access points
-    park_access_points_gdf = gpd.read_file(access_points_path).to_crs(TARGET_CRS)
+    park_access_points_gdf = gpd.read_file(access_points_path)
 
     # drop any rows where the geometry is null/missing
     park_access_points_gdf = park_access_points_gdf.dropna(subset=['geometry'])
+
+    # also drop "empty" geometries which can crash the CRS transformer
+    park_access_points_gdf = park_access_points_gdf[~park_access_points_gdf.geometry.is_empty]
+
+    # convert to the target CRS
+    park_access_points_gdf = park_access_points_gdf.to_crs(TARGET_CRS)
 
     # calculate nearest node in the street network to each park entrance and store in dataframe
     park_access_points_gdf['nearest_node'] = network.get_node_ids(
