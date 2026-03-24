@@ -56,11 +56,11 @@ def get_osm_features(network, bbox, tags):
         logging.warning(f"No features found for tags: {tags}. Skipping...")
         
         # Return an empty GeoDataFrame so the pipeline doesn't break
-        return gpd.GeoDataFrame(crs=TARGET_CRS)
+        return gpd.GeoDataFrame(geometry=[], crs=TARGET_CRS)
         
     except Exception as e:
         # Catch any other random network drops or timeout errors
         logging.error(f"An unexpected error occurred fetching {tags}: {e}")
-        return gpd.GeoDataFrame(crs=TARGET_CRS)
+        return gpd.GeoDataFrame(geometry=[], crs=TARGET_CRS)
     
     
