@@ -89,10 +89,10 @@ def main(
 
     # Filter water cells
     logging.info("Fetching administrative boundary to filter cells...")
-    cardiff_boundary = ox.geocode_to_gdf(CITY).to_crs(TARGET_CRS)
+    city_boundary = ox.geocode_to_gdf(CITY).to_crs(grid_cells_gdf.crs)
     
     logging.info(f"Grid cells before filtering: {len(grid_cells_gdf)}")
-    grid_cells_gdf = gpd.clip(grid_cells_gdf, cardiff_boundary)
+    grid_cells_gdf = gpd.clip(grid_cells_gdf, city_boundary)
     logging.info(f"Grid cells after filtering: {len(grid_cells_gdf)}")
 
     # Change the crs to lat/long so it can be visualised
