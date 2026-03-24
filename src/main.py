@@ -88,7 +88,7 @@ def main(
             grid_cells_gdf.loc[intersect.index, f'nearest_{name}'] = 0.0
 
     # Filter water cells
-    logging.info("Fetching Cardiff administrative boundary to filter water cells...")
+    logging.info("Fetching administrative boundary to filter cells...")
     cardiff_boundary = ox.geocode_to_gdf(CITY).to_crs(TARGET_CRS)
     
     logging.info(f"Grid cells before filtering: {len(grid_cells_gdf)}")
