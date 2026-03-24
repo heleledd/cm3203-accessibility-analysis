@@ -9,7 +9,7 @@ TARGET_CRS = 'EPSG:27700'
 
 # CARDIFF_BBOX = (-3.196, 51.494, -3.180, 51.500) # smaller box for testing
 
-CITY = os.environ.get('CITY', 'Cardiff, Wales, UK')
+CITY = os.environ.get('CITY', 'Swansea, Wales, UK')
 
 bbox_string = os.environ.get('BBOX', '-3.278, 51.447, -3.066, 51.554')
 CARDIFF_BBOX = tuple(float(coord.strip()) for coord in bbox_string.split(','))
