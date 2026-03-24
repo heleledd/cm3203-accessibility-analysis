@@ -41,13 +41,16 @@ def get_osm_features(network, bbox, tags):
     try:
         features_gdf = ox.features_from_bbox(bbox, tags=tags).to_crs(TARGET_CRS)
         features_gdf['centroid'] = features_gdf.geometry.centroid
-        return features_gdf
+        
     
         # snap centroids to the network
         features_gdf['nearest_node'] = network.get_node_ids(
             features_gdf['centroid'].x, 
             features_gdf['centroid'].y
         )
+
+        return features_gdf
+    
     except ox._errors.InsufficientResponseError:
         # Catch the specific OSMnx error when no features exist
         logging.warning(f"No features found for tags: {tags}. Skipping...")
