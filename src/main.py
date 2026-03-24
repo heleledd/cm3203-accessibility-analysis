@@ -5,7 +5,7 @@ import geopandas as gpd
 import osmnx as ox
 
 from config import (
-    CARDIFF_BBOX,
+    BBOX,
     GRID_SIZE_METERS,
     OUTPUT_DATA_DIR,
     PARK_BOUNDARY_PATH,
@@ -20,7 +20,7 @@ from amenities import get_park_data, get_osm_features
 
 
 def main(
-        bbox=CARDIFF_BBOX,
+        bbox=BBOX,
         grid_size=GRID_SIZE_METERS,
         park_access_points_path=PARK_ACCESS_POINTS_PATH,
         park_boundary_path=PARK_BOUNDARY_PATH,

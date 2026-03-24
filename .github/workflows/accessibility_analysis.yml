@@ -52,6 +52,7 @@ jobs:
       - name: Run analysis script
         env:
             BBOX: ${{ inputs.bbox }}
+            CITY: ${{ inputs.city }}
             ACCESS_POINTS_FILE: ${{ inputs.park_access_points_file }}
             BOUNDARY_FILE: ${{ inputs.park_boundary_file }}
         run: python src/main.py

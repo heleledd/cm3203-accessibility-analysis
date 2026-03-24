@@ -38,13 +38,26 @@ def get_osm_features(network, bbox, tags):
     """Downloads point/polygon features from OSM and maps their centroids to network nodes."""
     logging.info(f"Downloading OSM features for tags: {tags}...")
     
-    features_gdf = ox.features_from_bbox(bbox, tags=tags).to_crs(TARGET_CRS)
-    features_gdf['centroid'] = features_gdf.geometry.centroid
+    try:
+        features_gdf = ox.features_from_bbox(bbox, tags=tags).to_crs(TARGET_CRS)
+        features_gdf['centroid'] = features_gdf.geometry.centroid
+        return features_gdf
     
-    # snap centroids to the network
-    features_gdf['nearest_node'] = network.get_node_ids(
-        features_gdf['centroid'].x, 
-        features_gdf['centroid'].y
-    )
+        # snap centroids to the network
+        features_gdf['nearest_node'] = network.get_node_ids(
+            features_gdf['centroid'].x, 
+            features_gdf['centroid'].y
+        )
+    except ox._errors.InsufficientResponseError:
+        # Catch the specific OSMnx error when no features exist
+        logging.warning(f"No features found for tags: {tags}. Skipping...")
+        
+        # Return an empty GeoDataFrame so the pipeline doesn't break
+        return gpd.GeoDataFrame(crs=TARGET_CRS)
+        
+    except Exception as e:
+        # Catch any other random network drops or timeout errors
+        logging.error(f"An unexpected error occurred fetching {tags}: {e}")
+        return gpd.GeoDataFrame(crs=TARGET_CRS)
     
-    return features_gdf
+    

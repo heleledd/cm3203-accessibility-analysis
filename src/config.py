@@ -12,7 +12,7 @@ TARGET_CRS = 'EPSG:27700'
 CITY = os.environ.get('CITY', 'Swansea, Wales, UK')
 
 bbox_string = os.environ.get('BBOX', '-3.278, 51.447, -3.066, 51.554')
-CARDIFF_BBOX = tuple(float(coord.strip()) for coord in bbox_string.split(','))
+BBOX = tuple(float(coord.strip()) for coord in bbox_string.split(','))
 
 GRID_SIZE_METERS = 100
 
