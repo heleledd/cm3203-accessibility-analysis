@@ -16,8 +16,12 @@ pd.options.display.float_format = '{:.2f}'.format
 
 def get_street_network_graph(bbox):
     """Returns a projected Pandana network (EPSG:27700) and caches it to CSV."""
-    node_path = os.path.join(INPUT_DATA_DIR, 'street_network_nodes.csv')
-    edge_path = os.path.join(INPUT_DATA_DIR, 'street_network_edges.csv')
+    # Grab the city prefix dynamically
+    city_prefix = CITY.split(',')[0].lower().replace(' ', '_')
+    
+    # Make cache paths dynamic
+    node_path = os.path.join(INPUT_DATA_DIR, f'{city_prefix}_street_network_nodes.csv')
+    edge_path = os.path.join(INPUT_DATA_DIR, f'{city_prefix}_street_network_edges.csv')
     
     # --- AUTO-PURGE OLD CACHE ---
     if os.path.exists(node_path):
