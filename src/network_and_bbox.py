@@ -7,7 +7,7 @@ import pandana
 import geopandas as gpd
 from shapely.geometry import Point, box
 
-from config import TARGET_CRS, INPUT_DATA_DIR
+from config import TARGET_CRS, INPUT_DATA_DIR, CITY
 
 import warnings
 warnings.filterwarnings('ignore')
@@ -93,7 +93,11 @@ def reproject_bbox(bbox):
 
 def split_bbox_into_grid(bbox_reprojected, grid_size):
     """Split a projected bounding box into a grid of smaller cells."""
-    grid_path = os.path.join(INPUT_DATA_DIR, f'cardiff_grid_cells_{grid_size}m.geojson')
+    
+    city_prefix = CITY.split(',')[0].lower().replace(' ', '_')
+    
+    grid_path = os.path.join(INPUT_DATA_DIR, f'{city_prefix}_grid_cells_{grid_size}m.geojson')
+
     if os.path.exists(grid_path):
         logging.info("Cardiff grid cells GeoJSON already exists. Loading from file...")
         gdf = gpd.read_file(grid_path)

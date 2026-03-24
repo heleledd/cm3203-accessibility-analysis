@@ -1,0 +1,18 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Python Debugger: Current File",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "env": {
+                "CITY": "Swansea, Wales, UK",
+                "BBOX": "-4.088, 51.566, -3.822, 51.685", 
+                "ACCESS_POINTS_FILE": "swansea_greenspace_access_points.geojson",
+                "BOUNDARY_FILE": "swansea_greenspace_sites.geojson"
+            }
+        }
+    ]
+}

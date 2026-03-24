@@ -60,7 +60,7 @@ def main(
             'poi_y': gdf['centroid'].y
         }
 
-    MAX_DIST = 5000 # 5km max search distance
+    MAX_DIST = 20000 # 20km max search distance
     
     # ATTACH AMENITIES TO NETWORK
     logging.info("Attaching amenities to the network...")
